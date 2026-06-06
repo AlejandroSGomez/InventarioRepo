@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Inventario">
+    <meta name="theme-color" content="#f5efe6">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="color-scheme" content="light">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg:           #f5efe6;
+        --panel:        #fffdf9;
+        --panel-border: #e8ddd0;
+        --text:         #2c2118;
+        --muted:        #9a8878;
+        --faint:        #ede5da;
+
+        --primary:      oklch(60% 0.10 148);
+        --primary-txt:  #fffdf9;
+        --primary-hover:oklch(55% 0.10 148);
+        --primary-soft: oklch(94% 0.04 148);
+
+        --lavender:     oklch(72% 0.08 290);
+        --blush:        oklch(78% 0.08 10);
+
+        --danger:       oklch(55% 0.15 22);
+        --danger-bg:    oklch(96% 0.04 22);
+        --danger-line:  oklch(85% 0.08 22);
+
+        --warn-bg:      oklch(97% 0.04 80);
+        --warn-line:    oklch(82% 0.10 80);
+        --warn-text:    oklch(50% 0.10 60);
+
+        --success-bg:   oklch(96% 0.04 148);
+        --success-line: oklch(80% 0.09 148);
+        --success-text: oklch(40% 0.10 148);
+
+        --shadow:       0 2px 16px oklch(30% 0.05 60 / 0.09);
+        --shadow-lg:    0 8px 32px oklch(30% 0.05 60 / 0.12);
+        --radius:       14px;
+        --radius-sm:    9px;
+        --radius-lg:    20px;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      /* ===== Sensacion de app nativa (capa PWA) ===== */
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      /* Sin destello azul al tocar, sin menu de copiar al mantener pulsado,
+         sin seleccion accidental de texto en la interfaz, sin zoom por doble toque,
+         y rebote de scroll contenido como en una app real. */
+      body {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: manipulation;
+      }
+
+      /* Lo que SI debe poder seleccionarse / copiarse */
+      input, textarea, [contenteditable], .item-name {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+
+      /* Aparicion suave del contenido al abrir (como una transicion nativa) */
+      @media (prefers-reduced-motion: no-preference) {
+        main { animation: appFadeIn 0.34s ease both; }
+      }
+      @keyframes appFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: none; }
+      }
+
+      /* Pantalla de carga interna: elimina el flash en blanco al abrir en iOS */
+      #launch {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(1200px 700px at 100% -10%, oklch(94% 0.05 148 / 0.55), transparent 60%),
+          radial-gradient(900px 600px at -20% 110%, oklch(94% 0.04 290 / 0.45), transparent 55%),
+          var(--bg);
+        transition: opacity 0.4s ease;
+      }
+      #launch.hide { opacity: 0; pointer-events: none; }
+      .launch-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .launch-eyebrow {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .launch-title {
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--text);
+      }
+      .launch-spinner {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        border: 2.5px solid var(--panel-border);
+        border-top-color: var(--primary);
+        animation: launchSpin 0.7s linear infinite;
+      }
+      @keyframes launchSpin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        .launch-spinner { animation: none; }
+        main { animation: none; }
+      }
+
+      body {
+        min-height: 100vh;
+        background:
+          radial-gradient(1200px 700px at 100% -10%, oklch(94% 0.05 148 / 0.55), transparent 60%),
+          radial-gradient(900px 600px at -20% 110%, oklch(94% 0.04 290 / 0.45), transparent 55%),
+          var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.4;
+      }
+
+      main {
+        width: min(100%, 540px);
+        margin: 0 auto;
+        padding: max(28px, env(safe-area-inset-top)) 18px max(32px, env(safe-area-inset-bottom));
+      }
+
+      header {
+        padding-bottom: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .header-eyebrow {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      h1 {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: 0;
+        color: var(--text);
+        line-height: 1.15;
+      }
+
+      .filter-shell {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: start;
+        margin-bottom: 14px;
+      }
+
+      .category-filters {
+        display: flex;
+        gap: 4px;
+        background: oklch(97% 0.01 60 / 0.7);
+        border: 1px solid var(--panel-border);
+        border-radius: 999px;
+        padding: 4px;
+        min-width: 0;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+
+      .filter-pill {
+        flex: 1;
+        appearance: none;
+        border: 0;
+        background: transparent;
+        font: inherit;
+        font-size: 13.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--muted);
+        padding: 10px 8px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-width: 0;
+      }
+
+      .filter-pill:hover { color: var(--text); }
+
+      .filter-pill.active {
+        background: var(--text);
+        color: var(--panel);
+        box-shadow: 0 2px 8px oklch(30% 0.05 60 / 0.18);
+      }
+
+      .sort-wrap {
+        position: relative;
+      }
+
+      .sort-toggle {
+        width: 46px;
+        height: 46px;
+        appearance: none;
+        border: 1.5px solid var(--panel-border);
+        border-radius: 999px;
+        background: var(--panel);
+        color: var(--text);
+        font: inherit;
+        font-size: 28px;
+        font-weight: 300;
+        line-height: 1;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+        display: grid;
+        place-items: center;
+        transition: transform 0.12s, background 0.15s;
+      }
+
+      .sort-toggle:hover { background: var(--faint); }
+      .sort-toggle:active { transform: scale(0.96); }
+      .sort-toggle.active { background: var(--text); color: var(--panel); border-color: var(--text); }
+
+      .sort-menu {
+        position: absolute;
+        right: 0;
+        top: 54px;
+        z-index: 10;
+        width: 190px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 6px;
+      }
+
+      .sort-option {
+        width: 100%;
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        text-align: left;
+        padding: 10px 11px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+      }
+
+      .sort-option:hover { background: var(--faint); }
+      .sort-option.active { background: var(--primary-soft); color: var(--success-text); }
+
+      .search-shell {
+        margin-bottom: 14px;
+      }
+
+      .search-shell input {
+        min-height: 48px;
+        background: oklch(97% 0.01 60 / 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius);
+        padding: 22px 20px;
+        box-shadow: var(--shadow);
+      }
+
+      .panel + .panel { margin-top: 14px; }
+
+      .stack { display: grid; gap: 16px; }
+
+      label { display: grid; gap: 6px; }
+
+      .label-text {
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      input, textarea, select {
+        width: 100%;
+        border: 1.5px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+        font-size: 16px;
+        padding: 11px 13px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      input::placeholder, textarea::placeholder {
+        color: var(--muted);
+        opacity: 0.7;
+      }
+
+      input:focus, textarea:focus, select:focus {
+        border-color: var(--primary);
+        background: var(--panel);
+        box-shadow: 0 0 0 3px oklch(60% 0.10 148 / 0.14);
+      }
+
+      .select-wrap { position: relative; }
+      .select-wrap::after {
+        content: '';
+        position: absolute;
+        right: 13px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 0;
+        height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 6px solid var(--muted);
+        pointer-events: none;
+      }
+      .select-wrap select { padding-right: 32px; cursor: pointer; }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 126px;
+        gap: 12px;
+      }
+
+      .btn-primary {
+        width: 100%;
+        min-height: 50px;
+        border: none;
+        border-radius: var(--radius-sm);
+        background: var(--primary);
+        color: var(--primary-txt);
+        font: inherit;
+        font-size: 15.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.1s;
+        letter-spacing: 0.01em;
+      }
+      .btn-primary:hover { background: var(--primary-hover); }
+      .btn-primary:active { transform: scale(0.98); }
+      .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+
+      .message {
+        border-radius: var(--radius-sm);
+        border: 1.5px solid var(--panel-border);
+        padding: 12px 14px;
+        font-size: 14.5px;
+        color: var(--muted);
+        background: var(--panel);
+        line-height: 1.45;
+      }
+      .message.success { background: var(--success-bg); border-color: var(--success-line); color: var(--success-text); }
+      .message.warning { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-text); }
+      .message.error { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger); }
+
+      .hidden { display: none !important; }
+
+      .view-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        gap: 10px;
+      }
+
+      .view-title {
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .count-chip {
+        flex: 0 0 auto;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .item-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .item-empty {
+        text-align: center;
+        padding: 32px 12px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .item-skeleton {
+        height: 58px;
+        border-radius: var(--radius-sm);
+        background: linear-gradient(90deg, var(--faint) 0%, oklch(94% 0.02 60) 50%, var(--faint) 100%);
+        background-size: 200% 100%;
+        animation: shimmer 1.4s infinite;
+      }
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+
+      .item {
+        display: grid;
+        grid-template-columns: 42px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 11px 12px;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        transition: transform 0.15s, box-shadow 0.15s;
+      }
+      .item:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+
+      .item-quantity {
+        min-width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        font-size: 18px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .item-body {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .item-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .item-meta {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        color: var(--text);
+      }
+
+      .chip.food { color: oklch(48% 0.11 148); }
+      .chip.clean { color: oklch(50% 0.11 220); }
+      .chip.other { color: oklch(50% 0.11 290); }
+
+      .item-actions {
+        display: flex;
+        gap: 6px;
+      }
+
+      .item-action {
+        width: 34px;
+        height: 34px;
+        appearance: none;
+        border: 1.5px solid var(--panel-border);
+        border-radius: 999px;
+        background: var(--panel);
+        color: var(--text);
+        font: inherit;
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: background 0.15s, transform 0.1s;
+      }
+      .item-action:hover { background: var(--faint); }
+      .item-action:active { transform: scale(0.94); }
+      .item-action.delete { color: var(--danger); border-color: var(--danger-line); background: var(--danger-bg); }
+      .item-action:disabled { opacity: 0.45; cursor: wait; }
+
+      @media (max-width: 420px) {
+        body { font-size: 17px; }
+        main {
+          width: 100%;
+          padding: max(22px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom));
+        }
+        header { padding-bottom: 16px; }
+        h1 { font-size: 28px; }
+        .header-eyebrow { font-size: 12px; }
+        .filter-shell { grid-template-columns: 1fr auto; gap: 7px; }
+        .filter-pill { font-size: 13px; padding: 11px 6px; }
+        .sort-toggle { width: 48px; height: 48px; }
+        .search-shell input { min-height: 52px; }
+        .panel { border-radius: 16px; padding: 22px 18px; }
+        .stack { gap: 17px; }
+        .label-text { font-size: 12.5px; }
+        input, textarea, select {
+          min-height: 52px;
+          font-size: 17px;
+          padding: 13px 14px;
+        }
+        .btn-primary { min-height: 56px; font-size: 17px; }
+        .message { font-size: 15.5px; padding: 13px 14px; }
+        .row { grid-template-columns: 1fr 112px; gap: 10px; }
+        .item {
+          grid-template-columns: 42px minmax(0, 1fr) auto;
+          gap: 9px;
+          padding: 10px;
+        }
+        .item-actions { gap: 4px; }
+        .item-action { width: 32px; height: 32px; font-size: 19px; }
+      }
+
+      @media (max-width: 360px) {
+        .category-filters { gap: 2px; padding: 3px; }
+        .filter-pill { font-size: 12px; padding: 10px 4px; }
+        .row { grid-template-columns: 1fr; }
+        .item {
+          grid-template-columns: 38px minmax(0, 1fr);
+        }
+        .item-actions {
+          grid-column: 1 / -1;
+          justify-content: flex-end;
+        }
+        .item-quantity { min-width: 38px; height: 38px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="launch" aria-hidden="true">
+      <div class="launch-inner">
+        <span class="launch-eyebrow">Casa</span>
+        <span class="launch-title">Inventario Wiwiwiw</span>
+        <span class="launch-spinner"></span>
+      </div>
+    </div>
+    <script>
+      (function () {
+        function hideLaunch() {
+          var el = document.getElementById('launch');
+          if (el) el.classList.add('hide');
+        }
+        window.__hideLaunch = hideLaunch;
+        if (document.readyState === 'complete') {
+          window.setTimeout(hideLaunch, 200);
+        } else {
+          window.addEventListener('load', function () { window.setTimeout(hideLaunch, 200); });
+        }
+        // Failsafe: nunca dejar la pantalla de carga colgada
+        window.setTimeout(hideLaunch, 4000);
+      })();
+    </script>
+    <main>
+      <header>
+        <p class="header-eyebrow">Casa</p>
+        <h1>Inventario Wiwiwiw</h1>
+      </header>
+
+      <section class="filter-shell" aria-label="Filtros">
+        <div class="category-filters" id="categoryFilters"></div>
+        <div class="sort-wrap">
+          <button class="sort-toggle" id="sortToggle" type="button" aria-label="Ordenar">+</button>
+          <div class="sort-menu hidden" id="sortMenu">
+            <button class="sort-option active" type="button" data-sort="none">Sin orden</button>
+            <button class="sort-option" type="button" data-sort="alpha">Alfabético</button>
+            <button class="sort-option" type="button" data-sort="oldest">Mod. antiguo</button>
+            <button class="sort-option" type="button" data-sort="newest">Mod. reciente</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="search-shell" aria-label="Búsqueda">
+        <input id="searchInput" type="search" autocomplete="off" placeholder="Buscar objeto">
+      </section>
+
+      <section class="panel">
+        <form id="inventoryForm" class="stack">
+          <label>
+            <span class="label-text">Objeto</span>
+            <input id="itemObject" type="text" autocomplete="off" placeholder="Objeto">
+          </label>
+
+          <div class="row">
+            <label>
+              <span class="label-text">Categoría</span>
+              <div class="select-wrap">
+                <select id="itemCategory"></select>
+              </div>
+            </label>
+
+            <label>
+              <span class="label-text">Cantidad</span>
+              <input id="itemQuantity" type="number" min="1" step="1" inputmode="numeric" value="1">
+            </label>
+          </div>
+
+          <button id="addButton" class="btn-primary" type="submit">Añadir</button>
+        </form>
+
+        <div id="message" class="message hidden" style="margin-top: 16px;"></div>
+      </section>
+
+      <section class="panel">
+        <div class="view-head">
+          <span class="view-title">Inventario</span>
+          <span id="countChip" class="count-chip">0</span>
+        </div>
+        <div id="itemList" class="item-list"></div>
+      </section>
+    </main>
+
+    <script>
+      // ========================================================================
+      //  PEGA AQUI LA URL DE TU APPS SCRIPT (la que termina en /exec).
+      //  La consigues al desplegar el Code.gs como Web app. Mira el README.
+      //  Ejemplo: 'https://script.google.com/macros/s/AKfy..../exec'
+      // ========================================================================
+      const API_URL = 'https://script.google.com/macros/s/AKfycbx6yEUQVgZ8-tqItH0stL8FpMHgxWtdH4j0MmO3zCIpYOHUdr6upOuseINJNTBE8IpftQ/exec';
+
+      const CATEGORIES = ['Comida', 'Limpieza', 'Otros'];
+
+      const state = {
+        allItems: [],
+        selectedCategories: new Set(),
+        searchTerm: '',
+        sort: 'none',
+        busy: false,
+      };
+
+      const elements = {
+        categoryFilters: document.getElementById('categoryFilters'),
+        sortToggle: document.getElementById('sortToggle'),
+        sortMenu: document.getElementById('sortMenu'),
+        sortOptions: document.querySelectorAll('.sort-option'),
+        searchInput: document.getElementById('searchInput'),
+        inventoryForm: document.getElementById('inventoryForm'),
+        itemObject: document.getElementById('itemObject'),
+        itemCategory: document.getElementById('itemCategory'),
+        itemQuantity: document.getElementById('itemQuantity'),
+        addButton: document.getElementById('addButton'),
+        message: document.getElementById('message'),
+        itemList: document.getElementById('itemList'),
+        countChip: document.getElementById('countChip'),
+      };
+
+      init();
+
+      function init() {
+        renderCategoryControls(CATEGORIES);
+        fillCategorySelect(CATEGORIES);
+        bindEvents();
+        renderSkeletons(4);
+        loadInventory();
+      }
+
+      function bindEvents() {
+        elements.sortToggle.addEventListener('click', function() {
+          const next = elements.sortMenu.classList.contains('hidden');
+          elements.sortMenu.classList.toggle('hidden', !next);
+          elements.sortToggle.classList.toggle('active', next);
+        });
+
+        document.addEventListener('click', function(event) {
+          if (!event.target.closest('.sort-wrap')) {
+            elements.sortMenu.classList.add('hidden');
+            elements.sortToggle.classList.remove('active');
+          }
+        });
+
+        elements.sortOptions.forEach(function(option) {
+          option.addEventListener('click', function() {
+            state.sort = option.dataset.sort || 'none';
+            elements.sortOptions.forEach(function(o) {
+              o.classList.toggle('active', o.dataset.sort === state.sort);
+            });
+            elements.sortMenu.classList.add('hidden');
+            elements.sortToggle.classList.remove('active');
+            renderInventory();
+          });
+        });
+
+        elements.inventoryForm.addEventListener('submit', async function(event) {
+          event.preventDefault();
+          await addCurrentItem();
+        });
+
+        elements.searchInput.addEventListener('input', function() {
+          state.searchTerm = normalizeKey(elements.searchInput.value);
+          renderInventory();
+        });
+      }
+
+      function renderCategoryControls(categories) {
+        elements.categoryFilters.innerHTML = '';
+        categories.forEach(function(category) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'filter-pill';
+          button.textContent = category;
+          button.dataset.category = category;
+          button.addEventListener('click', function() {
+            if (state.selectedCategories.has(category)) {
+              state.selectedCategories.delete(category);
+            } else {
+              state.selectedCategories.add(category);
+            }
+            button.classList.toggle('active', state.selectedCategories.has(category));
+            renderInventory();
+          });
+          elements.categoryFilters.appendChild(button);
+        });
+      }
+
+      function fillCategorySelect(categories) {
+        elements.itemCategory.innerHTML = '';
+        categories.forEach(function(category) {
+          const option = document.createElement('option');
+          option.value = category;
+          option.textContent = category;
+          elements.itemCategory.appendChild(option);
+        });
+      }
+
+      async function loadInventory() {
+        setBusy(true);
+        try {
+          const response = await serverCall('getInventory', {});
+          state.allItems = response.items || [];
+          if (response.categories && response.categories.length) {
+            renderCategoryControls(response.categories);
+            fillCategorySelect(response.categories);
+          }
+          renderInventory();
+        } catch (error) {
+          elements.itemList.innerHTML = '';
+          showMessage(error.message || String(error), 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function addCurrentItem() {
+        const item = {
+          object: elements.itemObject.value.trim(),
+          category: elements.itemCategory.value,
+          quantity: parseQuantity(elements.itemQuantity.value),
+        };
+
+        if (!item.object) {
+          showMessage('Falta el objeto.', 'error');
+          elements.itemObject.focus();
+          return;
+        }
+        if (item.quantity < 1) {
+          showMessage('La cantidad debe ser al menos 1.', 'error');
+          elements.itemQuantity.focus();
+          return;
+        }
+
+        setBusy(true);
+        showMessage('Guardando...', '');
+        try {
+          const response = await serverCall('addInventoryItem', { item: item });
+          state.allItems = response.items || [];
+          elements.itemObject.value = '';
+          elements.itemQuantity.value = '1';
+          renderInventory();
+          showMessage(response.summary || 'Objeto añadido.', 'success');
+          elements.itemObject.focus();
+        } catch (error) {
+          showMessage(error.message || String(error), 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function updateQuantity(id, delta) {
+        setBusy(true);
+        try {
+          const response = await serverCall('changeQuantity', { id: id, delta: delta });
+          state.allItems = response.items || [];
+          renderInventory();
+          showMessage(response.summary || 'Cantidad actualizada.', 'success');
+        } catch (error) {
+          showMessage(error.message || String(error), 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function removeItem(id) {
+        setBusy(true);
+        try {
+          const response = await serverCall('deleteInventoryItem', { id: id });
+          state.allItems = response.items || [];
+          renderInventory();
+          showMessage(response.summary || 'Objeto eliminado.', 'success');
+        } catch (error) {
+          showMessage(error.message || String(error), 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function renderInventory() {
+        const visible = getVisibleItems();
+        elements.itemList.innerHTML = '';
+        elements.countChip.textContent = String(visible.length);
+
+        if (!visible.length) {
+          const empty = document.createElement('div');
+          empty.className = 'item-empty';
+          empty.textContent = 'No hay objetos para estos filtros.';
+          elements.itemList.appendChild(empty);
+          return;
+        }
+
+        visible.forEach(function(item) {
+          const row = document.createElement('div');
+          row.className = 'item';
+
+          const quantity = document.createElement('div');
+          quantity.className = 'item-quantity';
+          quantity.textContent = String(item.quantity || 0);
+          row.appendChild(quantity);
+
+          const body = document.createElement('div');
+          body.className = 'item-body';
+
+          const name = document.createElement('div');
+          name.className = 'item-name';
+          name.textContent = item.object || 'Objeto';
+          body.appendChild(name);
+
+          const meta = document.createElement('div');
+          meta.className = 'item-meta';
+          const chip = document.createElement('span');
+          chip.className = 'chip ' + categoryClass(item.category);
+          chip.textContent = item.category || 'Otros';
+          meta.appendChild(chip);
+          const date = document.createElement('span');
+          date.textContent = formatModifiedEs(item.dateModified || item.dateAdded);
+          meta.appendChild(date);
+          body.appendChild(meta);
+
+          row.appendChild(body);
+
+          const actions = document.createElement('div');
+          actions.className = 'item-actions';
+          actions.appendChild(makeItemButton('+', function() {
+            updateQuantity(item.id, 1);
+          }));
+          actions.appendChild(makeItemButton('-', function() {
+            updateQuantity(item.id, -1);
+          }));
+          actions.appendChild(makeItemButton('x', function() {
+            removeItem(item.id);
+          }, 'delete'));
+          row.appendChild(actions);
+
+          elements.itemList.appendChild(row);
+        });
+      }
+
+      function getVisibleItems() {
+        let items = state.allItems.slice();
+        if (state.selectedCategories.size) {
+          items = items.filter(function(item) {
+            return state.selectedCategories.has(item.category);
+          });
+        }
+        if (state.searchTerm) {
+          items = items.filter(function(item) {
+            return normalizeKey(item.object).indexOf(state.searchTerm) !== -1;
+          });
+        }
+
+        if (state.sort === 'alpha') {
+          items.sort(function(a, b) {
+            return normalizeKey(a.object).localeCompare(normalizeKey(b.object), 'es');
+          });
+        } else if (state.sort === 'oldest') {
+          items.sort(function(a, b) {
+            return dateTimeKey(a.dateModified || a.dateAdded) - dateTimeKey(b.dateModified || b.dateAdded);
+          });
+        } else if (state.sort === 'newest') {
+          items.sort(function(a, b) {
+            return dateTimeKey(b.dateModified || b.dateAdded) - dateTimeKey(a.dateModified || a.dateAdded);
+          });
+        }
+
+        return items;
+      }
+
+      function makeItemButton(label, handler, extraClass) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'item-action' + (extraClass ? ' ' + extraClass : '');
+        button.textContent = label;
+        button.setAttribute('aria-label', label);
+        button.addEventListener('click', handler);
+        button.disabled = state.busy;
+        return button;
+      }
+
+      function renderSkeletons(n) {
+        elements.itemList.innerHTML = '';
+        for (let i = 0; i < n; i++) {
+          const skeleton = document.createElement('div');
+          skeleton.className = 'item-skeleton';
+          elements.itemList.appendChild(skeleton);
+        }
+      }
+
+      function showMessage(text, kind) {
+        elements.message.textContent = text;
+        elements.message.className = 'message';
+        if (kind) elements.message.classList.add(kind);
+        elements.message.classList.toggle('hidden', !text);
+      }
+
+      function setBusy(isBusy) {
+        state.busy = isBusy;
+        elements.addButton.disabled = isBusy;
+        elements.itemList.querySelectorAll('.item-action').forEach(function(button) {
+          button.disabled = isBusy;
+        });
+      }
+
+      // Llama a la API de Apps Script (alojada en otro dominio) por fetch.
+      // Usamos POST con Content-Type text/plain a proposito: asi el navegador
+      // NO hace preflight CORS y la peticion funciona contra Apps Script.
+      async function serverCall(name, payload) {
+        if (!API_URL || API_URL.indexOf('PEGA_AQUI') === 0) {
+          throw new Error('Falta configurar API_URL en index.html (pega tu URL /exec).');
+        }
+
+        let res;
+        try {
+          res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: name, payload: payload || {} }),
+            redirect: 'follow',
+          });
+        } catch (networkError) {
+          throw new Error('Sin conexión con el servidor. Revisa tu internet.');
+        }
+
+        let json;
+        try {
+          json = await res.json();
+        } catch (parseError) {
+          throw new Error('Respuesta inválida del servidor (¿URL /exec correcta?).');
+        }
+
+        if (!json || json.ok !== true) {
+          throw new Error((json && json.error) ? json.error : 'Error del servidor.');
+        }
+        return json.data;
+      }
+
+      function parseQuantity(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.max(0, Math.floor(Math.abs(number))) : 0;
+      }
+
+      function normalizeKey(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function dateTimeKey(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/.exec(String(value || ''));
+        if (!match) return 0;
+        return Number(
+          match[1]
+          + match[2]
+          + match[3]
+          + (match[4] || '00')
+          + (match[5] || '00')
+          + (match[6] || '00')
+        );
+      }
+
+      function categoryClass(category) {
+        const key = normalizeKey(category);
+        if (key === 'comida') return 'food';
+        if (key === 'limpieza') return 'clean';
+        return 'other';
+      }
+
+      const MONTHS_ES_FULL = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+      ];
+
+      function formatDateEs(iso) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+        if (!match) return String(iso || '');
+        const year = match[1];
+        const month = Number(match[2]) - 1;
+        const day = Number(match[3]);
+        return day + ' ' + (MONTHS_ES_FULL[month] || '') + ' ' + year;
+      }
+
+      function formatModifiedEs(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/.exec(String(value || ''));
+        if (!match) return String(value || '');
+
+        const year = match[1];
+        const month = Number(match[2]) - 1;
+        const day = Number(match[3]);
+        const time = match[4] ? ' ' + match[4] + ':' + match[5] : '';
+        return 'mod. ' + day + ' ' + (MONTHS_ES_FULL[month] || '') + ' ' + year + time;
+      }
+
+    </script>
+  </body>
+</html>
