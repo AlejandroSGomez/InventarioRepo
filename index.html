@@ -136,6 +136,105 @@
         main { animation: none; }
       }
 
+      /* ===== Pantalla de bloqueo / login (igual estetica que #launch) ===== */
+      #login {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: grid;
+        place-items: center;
+        padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        background:
+          radial-gradient(1200px 700px at 100% -10%, oklch(94% 0.05 148 / 0.55), transparent 60%),
+          radial-gradient(900px 600px at -20% 110%, oklch(94% 0.04 290 / 0.45), transparent 55%),
+          var(--bg);
+        transition: opacity 0.4s ease, transform 0.4s ease;
+      }
+      #login.hide { opacity: 0; transform: scale(0.98); pointer-events: none; }
+      .login-card {
+        width: min(100%, 360px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+      .login-eyebrow {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .login-title {
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--text);
+        text-align: center;
+      }
+      .login-spinner {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        border: 2.5px solid var(--panel-border);
+        border-top-color: var(--primary);
+        animation: launchSpin 0.7s linear infinite;
+        margin-top: 4px;
+      }
+      .login-form {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 4px;
+      }
+      .login-pin {
+        width: 100%;
+        min-height: 54px;
+        text-align: center;
+        font-size: 22px;
+        letter-spacing: 0.4em;
+        font-variant-numeric: tabular-nums;
+        border: 1.5px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        background: var(--panel);
+        color: var(--text);
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .login-pin:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px oklch(60% 0.10 148 / 0.14);
+      }
+      .login-pin::placeholder { letter-spacing: 0.2em; color: var(--muted); opacity: 0.55; }
+      .login-button {
+        width: 100%;
+        min-height: 50px;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: var(--primary);
+        color: var(--primary-txt);
+        font: inherit;
+        font-size: 15.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.1s;
+      }
+      .login-button:hover { background: var(--primary-hover); }
+      .login-button:active { transform: scale(0.98); }
+      .login-button:disabled { opacity: 0.55; cursor: wait; }
+      .login-error {
+        min-height: 18px;
+        font-size: 13px;
+        color: var(--danger);
+        text-align: center;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .login-spinner { animation: none; }
+      }
+
       body {
         min-height: 100vh;
         background:
@@ -586,29 +685,19 @@
     </style>
   </head>
   <body>
-    <div id="launch" aria-hidden="true">
-      <div class="launch-inner">
-        <span class="launch-eyebrow">Casa</span>
-        <span class="launch-title">Inventario Wiwiwiw</span>
-        <span class="launch-spinner"></span>
+    <div id="login" aria-hidden="false">
+      <div class="login-card">
+        <span class="login-eyebrow">Casa</span>
+        <span class="login-title">Inventario Wiwiwiw</span>
+        <span class="login-spinner" id="loginSpinner"></span>
+        <form id="loginForm" class="login-form hidden" autocomplete="off">
+          <input id="loginPin" class="login-pin" type="password" inputmode="numeric"
+                 autocomplete="current-password" placeholder="••••" aria-label="PIN">
+          <button type="submit" id="loginButton" class="login-button">Entrar</button>
+          <div id="loginError" class="login-error" role="alert"></div>
+        </form>
       </div>
     </div>
-    <script>
-      (function () {
-        function hideLaunch() {
-          var el = document.getElementById('launch');
-          if (el) el.classList.add('hide');
-        }
-        window.__hideLaunch = hideLaunch;
-        if (document.readyState === 'complete') {
-          window.setTimeout(hideLaunch, 200);
-        } else {
-          window.addEventListener('load', function () { window.setTimeout(hideLaunch, 200); });
-        }
-        // Failsafe: nunca dejar la pantalla de carga colgada
-        window.setTimeout(hideLaunch, 4000);
-      })();
-    </script>
     <main>
       <header>
         <p class="header-eyebrow">Casa</p>
@@ -677,6 +766,7 @@
       const API_URL = 'https://script.google.com/macros/s/AKfycbx6yEUQVgZ8-tqItH0stL8FpMHgxWtdH4j0MmO3zCIpYOHUdr6upOuseINJNTBE8IpftQ/exec';
 
       const CATEGORIES = ['Comida', 'Limpieza', 'Otros'];
+      const PIN_STORAGE_KEY = 'inventarioWiwiwiwPin';
 
       const state = {
         allItems: [],
@@ -684,6 +774,7 @@
         searchTerm: '',
         sort: 'none',
         busy: false,
+        pin: '',
       };
 
       const elements = {
@@ -700,9 +791,15 @@
         message: document.getElementById('message'),
         itemList: document.getElementById('itemList'),
         countChip: document.getElementById('countChip'),
+        login:        document.getElementById('login'),
+        loginSpinner: document.getElementById('loginSpinner'),
+        loginForm:    document.getElementById('loginForm'),
+        loginPin:     document.getElementById('loginPin'),
+        loginButton:  document.getElementById('loginButton'),
+        loginError:   document.getElementById('loginError'),
       };
 
-      init();
+      bootstrapAuth();
 
       function init() {
         renderCategoryControls(CATEGORIES);
@@ -989,17 +1086,20 @@
       // Llama a la API de Apps Script (alojada en otro dominio) por fetch.
       // Usamos POST con Content-Type text/plain a proposito: asi el navegador
       // NO hace preflight CORS y la peticion funciona contra Apps Script.
+      // Inyecta state.pin automaticamente en cada llamada (gestionado por
+      // bootstrapAuth) salvo que la llamada ya traiga su propio pin.
       async function serverCall(name, payload) {
         if (!API_URL || API_URL.indexOf('PEGA_AQUI') === 0) {
           throw new Error('Falta configurar API_URL en index.html (pega tu URL /exec).');
         }
+        const finalPayload = Object.assign({ pin: state.pin || '' }, payload || {});
 
         let res;
         try {
           res = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: name, payload: payload || {} }),
+            body: JSON.stringify({ action: name, payload: finalPayload }),
             redirect: 'follow',
           });
         } catch (networkError) {
@@ -1014,10 +1114,91 @@
         }
 
         if (!json || json.ok !== true) {
-          throw new Error((json && json.error) ? json.error : 'Error del servidor.');
+          const message = (json && json.error) ? json.error : 'Error del servidor.';
+          // Si el PIN ha dejado de ser valido (cambio en backend, p.ej.),
+          // volvemos a la pantalla de login para no quedar atrapado.
+          if (/pin/i.test(message)) requestRelogin(message);
+          throw new Error(message);
         }
         return json.data;
       }
+
+      // ===================================================================
+      //   Pantalla de bloqueo / login
+      // ===================================================================
+      async function bootstrapAuth() {
+        const stored = (window.localStorage.getItem(PIN_STORAGE_KEY) || '').trim();
+        if (stored) {
+          state.pin = stored;
+          try {
+            await verifyPinAgainstBackend(stored);
+            unlock();
+            return;
+          } catch (error) {
+            state.pin = '';
+            showLoginForm(error.message || 'PIN incorrecto.');
+            return;
+          }
+        }
+        showLoginForm('');
+      }
+
+      function showLoginForm(errorMessage) {
+        elements.loginSpinner.classList.add('hidden');
+        elements.loginForm.classList.remove('hidden');
+        elements.loginError.textContent = errorMessage || '';
+        window.setTimeout(function() { elements.loginPin.focus(); }, 50);
+      }
+
+      function unlock() {
+        elements.login.classList.add('hide');
+        elements.login.setAttribute('aria-hidden', 'true');
+        if (!state.initialized) {
+          state.initialized = true;
+          init();
+        }
+      }
+
+      function requestRelogin(message) {
+        state.pin = '';
+        window.localStorage.removeItem(PIN_STORAGE_KEY);
+        elements.login.classList.remove('hide');
+        elements.login.setAttribute('aria-hidden', 'false');
+        showLoginForm(message || 'El PIN ya no es válido. Vuelve a introducirlo.');
+      }
+
+      async function verifyPinAgainstBackend(pin) {
+        const previous = state.pin;
+        state.pin = pin;
+        try {
+          await serverCall('verifyPin', {});
+        } catch (error) {
+          state.pin = previous;
+          throw error;
+        }
+      }
+
+      elements.loginForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const candidate = elements.loginPin.value.trim();
+        if (!candidate) {
+          elements.loginError.textContent = 'Introduce el PIN.';
+          return;
+        }
+        elements.loginButton.disabled = true;
+        elements.loginError.textContent = '';
+        try {
+          await verifyPinAgainstBackend(candidate);
+          window.localStorage.setItem(PIN_STORAGE_KEY, candidate);
+          elements.loginPin.value = '';
+          unlock();
+        } catch (error) {
+          elements.loginError.textContent = error.message || 'PIN incorrecto.';
+          elements.loginPin.select();
+        } finally {
+          elements.loginButton.disabled = false;
+        }
+      });
 
       function parseQuantity(value) {
         const number = Number(value);
